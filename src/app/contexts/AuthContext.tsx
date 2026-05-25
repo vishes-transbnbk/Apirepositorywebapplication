@@ -1,4 +1,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 interface User {
   email: string;
@@ -17,42 +23,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('api-repo-user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+    // Check if user is already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.email) {
+        setUser({ email: session.user.email });
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.email) {
+        setUser({ email: session.user.email });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
-    const users = JSON.parse(localStorage.getItem('api-repo-users') || '{}');
-
-    if (!users[email]) {
-      throw new Error('Invalid credentials');
-    }
-
-    if (users[email].password !== password) {
-      throw new Error('Invalid credentials');
-    }
-
-    const user = { email };
-    setUser(user);
-    localStorage.setItem('api-repo-user', JSON.stringify(user));
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
   };
 
   const signup = async (email: string, password: string) => {
-    const users = JSON.parse(localStorage.getItem('api-repo-users') || '{}');
-
-    if (users[email]) {
-      throw new Error('User already exists');
-    }
-
-    users[email] = { password };
-    localStorage.setItem('api-repo-users', JSON.stringify(users));
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) throw new Error(error.message);
   };
 
   const logout = () => {
+    supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('api-repo-user');
   };
 
   return (
