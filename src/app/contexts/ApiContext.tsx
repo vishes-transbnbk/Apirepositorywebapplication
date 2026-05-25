@@ -1,4 +1,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 export interface ApiRecord {
   id: string;
@@ -19,10 +25,10 @@ export interface ApiRecord {
 
 interface ApiContextType {
   apis: ApiRecord[];
-  addApi: (api: Omit<ApiRecord, 'id' | 'createdAt'>) => void;
-  updateApi: (id: string, api: Omit<ApiRecord, 'id' | 'createdAt'>) => void;
-  deleteApi: (id: string) => void;
-  toggleStatus: (id: string) => void;
+  addApi: (api: Omit<ApiRecord, 'id' | 'createdAt'>) => Promise<void>;
+  updateApi: (id: string, api: Omit<ApiRecord, 'id' | 'createdAt'>) => Promise<void>;
+  deleteApi: (id: string) => Promise<void>;
+  toggleStatus: (id: string) => Promise<void>;
   checkDuplicate: (name: string, vendor: string, excludeId?: string) => boolean;
 }
 
@@ -31,122 +37,122 @@ const ApiContext = createContext<ApiContextType | undefined>(undefined);
 export function ApiProvider({ children }: { children: ReactNode }) {
   const [apis, setApis] = useState<ApiRecord[]>([]);
 
-  useEffect(() => {
-    const storedApis = localStorage.getItem('api-repo-apis');
-    if (storedApis) {
-      setApis(JSON.parse(storedApis));
-    } else {
-      const mockData: ApiRecord[] = [
-        {
-          id: '1',
-          jiraId: 'API-001',
-          name: 'User Authentication API',
-          vendor: 'Auth0',
-          type: 'REST',
-          description: 'Handles user authentication and authorization',
-          vendorUat: `curl --location 'https://uat.auth0.com/api/v1/auth' \\
---header 'Content-Type: application/json' \\
---header 'Authorization: Bearer {token}' \\
---data '{"username": "testuser", "password": "testpass"}'`,
-          vendorProd: `curl --location 'https://prod.auth0.com/api/v1/auth' \\
---header 'Content-Type: application/json' \\
---header 'Authorization: Bearer {token}' \\
---data '{"username": "user", "password": "pass"}'`,
-          trusthubUat: `curl --location 'https://uat.trusthub.com/auth' \\
---header 'x-api-key: {api_key}' \\
---data '{"mobile": "1234567890"}'`,
-          trusthubProd: 'curl -X POST https://prod.trusthub.com/auth',
-          documentLink: 'https://docs.auth0.com/api',
-          remarks: 'Critical service - monitor closely',
-          status: 'active',
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: '2',
-          jiraId: 'API-002',
-          name: 'Payment Processing API',
-          vendor: 'Stripe',
-          type: 'REST',
-          description: 'Processes payment transactions',
-          vendorUat: 'curl -X POST https://uat.stripe.com/api/v1/payments',
-          vendorProd: 'curl -X POST https://prod.stripe.com/api/v1/payments',
-          trusthubUat: 'curl -X POST https://uat.trusthub.com/payments',
-          trusthubProd: 'curl -X POST https://prod.trusthub.com/payments',
-          documentLink: 'https://stripe.com/docs/api',
-          status: 'active',
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: '3',
-          jiraId: 'API-003',
-          name: 'Customer Data API',
-          vendor: 'Salesforce',
-          type: 'SOAP',
-          description: 'Retrieves customer information',
-          vendorUat: 'curl -X GET https://uat.salesforce.com/api/customers',
-          vendorProd: 'curl -X GET https://prod.salesforce.com/api/customers',
-          status: 'active',
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: '4',
-          jiraId: 'API-004',
-          name: 'Email Notification API',
-          vendor: 'SendGrid',
-          type: 'REST',
-          description: 'Sends email notifications to users',
-          status: 'inactive',
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: '5',
-          jiraId: 'API-005',
-          name: 'Analytics API',
-          vendor: 'Google',
-          type: 'GraphQL',
-          description: 'Tracks user analytics and events',
-          vendorProd: 'curl -X POST https://analytics.google.com/api/events',
-          status: 'active',
-          createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-      ];
-      setApis(mockData);
-      localStorage.setItem('api-repo-apis', JSON.stringify(mockData));
+  const fetchApis = async () => {
+    const { data, error } = await supabase
+      .from('apis')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching apis:', error);
+      return;
     }
+
+    const mapped: ApiRecord[] = (data ?? []).map((a: any) => ({
+      id: a.id,
+      jiraId: a.jira_id,
+      name: a.name,
+      vendor: a.vendor,
+      type: a.type,
+      description: a.description,
+      vendorUat: a.vendor_uat,
+      vendorProd: a.vendor_prod,
+      trusthubUat: a.trusthub_uat,
+      trusthubProd: a.trusthub_prod,
+      documentLink: a.document_link,
+      remarks: a.remarks,
+      status: a.status,
+      createdAt: a.created_at,
+    }));
+
+    setApis(mapped);
+  };
+
+  useEffect(() => {
+    // Wait for auth state before fetching
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        fetchApis();
+      } else {
+        setApis([]);
+      }
+    });
+
+    // Also fetch immediately if already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) fetchApis();
+    });
+
+    // Real-time sync across browsers
+    const channel = supabase
+      .channel('apis-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'apis' }, () => {
+        fetchApis();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const saveApis = (newApis: ApiRecord[]) => {
-    setApis(newApis);
-    localStorage.setItem('api-repo-apis', JSON.stringify(newApis));
-  };
+  const addApi = async (api: Omit<ApiRecord, 'id' | 'createdAt'>) => {
+    const { data: { session } } = await supabase.auth.getSession();
 
-  const addApi = (api: Omit<ApiRecord, 'id' | 'createdAt'>) => {
-    const newApi: ApiRecord = {
-      ...api,
+    const { error } = await supabase.from('apis').insert({
       id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    };
-    saveApis([...apis, newApi]);
+      user_id: session?.user?.id,
+      jira_id: api.jiraId,
+      name: api.name,
+      vendor: api.vendor,
+      type: api.type,
+      description: api.description,
+      vendor_uat: api.vendorUat,
+      vendor_prod: api.vendorProd,
+      trusthub_uat: api.trusthubUat,
+      trusthub_prod: api.trusthubProd,
+      document_link: api.documentLink,
+      remarks: api.remarks,
+      status: api.status,
+    });
+
+    if (error) console.error('Error adding api:', error);
   };
 
-  const updateApi = (id: string, api: Omit<ApiRecord, 'id' | 'createdAt'>) => {
-    const updatedApis = apis.map((a) =>
-      a.id === id ? { ...a, ...api } : a
-    );
-    saveApis(updatedApis);
+  const updateApi = async (id: string, api: Omit<ApiRecord, 'id' | 'createdAt'>) => {
+    const { error } = await supabase.from('apis').update({
+      jira_id: api.jiraId,
+      name: api.name,
+      vendor: api.vendor,
+      type: api.type,
+      description: api.description,
+      vendor_uat: api.vendorUat,
+      vendor_prod: api.vendorProd,
+      trusthub_uat: api.trusthubUat,
+      trusthub_prod: api.trusthubProd,
+      document_link: api.documentLink,
+      remarks: api.remarks,
+      status: api.status,
+    }).eq('id', id);
+
+    if (error) console.error('Error updating api:', error);
   };
 
-  const deleteApi = (id: string) => {
-    saveApis(apis.filter((a) => a.id !== id));
+  const deleteApi = async (id: string) => {
+    const { error } = await supabase.from('apis').delete().eq('id', id);
+    if (error) console.error('Error deleting api:', error);
   };
 
-  const toggleStatus = (id: string) => {
-    const updatedApis = apis.map((a) =>
-      a.id === id
-        ? { ...a, status: a.status === 'active' ? 'inactive' as const : 'active' as const }
-        : a
-    );
-    saveApis(updatedApis);
+  const toggleStatus = async (id: string) => {
+    const api = apis.find((a) => a.id === id);
+    if (!api) return;
+
+    const { error } = await supabase.from('apis').update({
+      status: api.status === 'active' ? 'inactive' : 'active',
+    }).eq('id', id);
+
+    if (error) console.error('Error toggling status:', error);
   };
 
   const checkDuplicate = (name: string, vendor: string, excludeId?: string): boolean => {
