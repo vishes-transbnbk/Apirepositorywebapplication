@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useApi, ApiRecord } from '../contexts/ApiContext';
 import { Pencil, Filter, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -6,6 +6,92 @@ import ApiModal from './ApiModal';
 import ConfirmDialog from './ConfirmDialog';
 import CurlModal from './CurlModal';
 import { toast } from 'sonner';
+
+function FilterDropdown({
+  columnKey,
+  uniqueValues,
+  selectedValues,
+  onToggle,
+  onSelectAll,
+}: {
+  columnKey: string;
+  uniqueValues: string[];
+  selectedValues: string[];
+  onToggle: (column: string, value: string) => void;
+  onSelectAll: (column: string, values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  const allSelected = uniqueValues.length > 0 && uniqueValues.every((v) => selectedValues.includes(v));
+  const someSelected = selectedValues.length > 0 && !allSelected;
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + window.scrollY + 4,
+        left: Math.max(0, rect.right + window.scrollX - 150),
+      });
+    }
+    setOpen((o) => !o);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropRef.current && !dropRef.current.contains(e.target as Node) &&
+        btnRef.current && !btnRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  return (
+    <div className="relative">
+      <button ref={btnRef} onClick={handleOpen} className="p-1 hover:bg-slate-200 rounded">
+        <Filter size={14} className={selectedValues.length > 0 ? 'text-blue-600' : 'text-slate-400'} />
+      </button>
+      {open && (
+        <div
+          ref={dropRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="bg-white border border-slate-200 rounded-md shadow-lg min-w-[150px]"
+        >
+          <div className="max-h-60 overflow-y-auto p-2">
+            <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-100 mb-1">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                onChange={() => onSelectAll(columnKey, uniqueValues)}
+                className="rounded border-slate-300"
+              />
+              <span className="text-slate-700 font-medium">Select All</span>
+            </label>
+            {uniqueValues.map((value) => (
+              <label key={value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={selectedValues.includes(value)}
+                  onChange={() => onToggle(columnKey, value)}
+                  className="rounded border-slate-300"
+                />
+                <span className="text-slate-700">{value}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ViewPage() {
   const { apis, toggleStatus } = useApi();
@@ -86,11 +172,9 @@ export default function ViewPage() {
       const allSelected = allValues.every((v) => currentValues.includes(v));
 
       if (allSelected) {
-        // Deselect all — remove the column filter entirely
         const { [column]: removed, ...rest } = prev;
         return rest;
       } else {
-        // Select all
         return { ...prev, [column]: allValues };
       }
     });
@@ -177,10 +261,6 @@ export default function ViewPage() {
           <thead className="bg-slate-100 sticky top-0 z-10">
             <tr>
               {columns.map((column) => {
-                const uniqueValues = getUniqueValues(column.key);
-                const selectedValues = columnFilters[column.key] || [];
-                const allSelected = uniqueValues.length > 0 && uniqueValues.every((v) => selectedValues.includes(v));
-                const someSelected = selectedValues.length > 0 && !allSelected;
                 const showFilter =
                   column.key !== 'description' &&
                   column.key !== 'vendorUat' &&
@@ -199,46 +279,13 @@ export default function ViewPage() {
                     <div className="flex items-center justify-between gap-2">
                       <span>{column.label}</span>
                       {showFilter && (
-                        <div className="relative group">
-                          <button className="p-1 hover:bg-slate-200 rounded">
-                            <Filter
-                              size={14}
-                              className={selectedValues.length > 0 ? 'text-blue-600' : 'text-slate-400'}
-                            />
-                          </button>
-                          <div className="hidden group-hover:block absolute right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-20 min-w-[150px]">
-                            <div className="max-h-60 overflow-y-auto p-2">
-                              {/* Select All row */}
-                              <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-100 mb-1">
-                                <input
-                                  type="checkbox"
-                                  checked={allSelected}
-                                  ref={(el) => {
-                                    if (el) el.indeterminate = someSelected;
-                                  }}
-                                  onChange={() => handleSelectAll(column.key, uniqueValues)}
-                                  className="rounded border-slate-300"
-                                />
-                                <span className="text-slate-700 font-medium">Select All</span>
-                              </label>
-                              {/* Individual options */}
-                              {uniqueValues.map((value) => (
-                                <label
-                                  key={value}
-                                  className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-sm"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedValues.includes(value)}
-                                    onChange={() => handleColumnFilter(column.key, value)}
-                                    className="rounded border-slate-300"
-                                  />
-                                  <span className="text-slate-700">{value}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
+                        <FilterDropdown
+                          columnKey={column.key}
+                          uniqueValues={getUniqueValues(column.key)}
+                          selectedValues={columnFilters[column.key] || []}
+                          onToggle={handleColumnFilter}
+                          onSelectAll={handleSelectAll}
+                        />
                       )}
                     </div>
                   </th>
