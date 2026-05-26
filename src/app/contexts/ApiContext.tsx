@@ -97,7 +97,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const addApi = async (api: Omit<ApiRecord, 'id' | 'createdAt'>) => {
+const addApi = async (api: Omit<ApiRecord, 'id' | 'createdAt'>) => {
     const { data: { session } } = await supabase.auth.getSession();
 
     const { error } = await supabase.from('apis').insert({
@@ -118,6 +118,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) console.error('Error adding api:', error);
+    else await fetchApis(); // ← add this
   };
 
   const updateApi = async (id: string, api: Omit<ApiRecord, 'id' | 'createdAt'>) => {
@@ -137,11 +138,13 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     }).eq('id', id);
 
     if (error) console.error('Error updating api:', error);
+    else await fetchApis(); // ← add this
   };
 
   const deleteApi = async (id: string) => {
     const { error } = await supabase.from('apis').delete().eq('id', id);
     if (error) console.error('Error deleting api:', error);
+    else await fetchApis(); // ← add this
   };
 
   const toggleStatus = async (id: string) => {
@@ -153,6 +156,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     }).eq('id', id);
 
     if (error) console.error('Error toggling status:', error);
+    else await fetchApis(); // ← add this
   };
 
   const checkDuplicate = (name: string, vendor: string, excludeId?: string): boolean => {
