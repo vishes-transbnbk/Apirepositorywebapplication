@@ -80,6 +80,22 @@ export default function ViewPage() {
     });
   };
 
+  const handleSelectAll = (column: string, allValues: string[]) => {
+    setColumnFilters((prev) => {
+      const currentValues = prev[column] || [];
+      const allSelected = allValues.every((v) => currentValues.includes(v));
+
+      if (allSelected) {
+        // Deselect all — remove the column filter entirely
+        const { [column]: removed, ...rest } = prev;
+        return rest;
+      } else {
+        // Select all
+        return { ...prev, [column]: allValues };
+      }
+    });
+  };
+
   const exportToExcel = () => {
     const exportData = apis.map((api) => ({
       'JIRA ID': api.jiraId || '',
@@ -160,39 +176,74 @@ export default function ViewPage() {
         <table className="w-full border-collapse">
           <thead className="bg-slate-100 sticky top-0 z-10">
             <tr>
-              {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200"
-                  style={{ minWidth: column.width }}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span>{column.label}</span>
-                    {column.key !== 'description' && column.key !== 'vendorUat' && column.key !== 'vendorProd' && column.key !== 'trusthubUat' && column.key !== 'trusthubProd' && column.key !== 'documentLink' && column.key !== 'remarks' && (
-                      <div className="relative group">
-                        <button className="p-1 hover:bg-slate-200 rounded">
-                          <Filter size={14} className={columnFilters[column.key]?.length > 0 ? 'text-blue-600' : 'text-slate-400'} />
-                        </button>
-                        <div className="hidden group-hover:block absolute right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-20 min-w-[150px]">
-                          <div className="max-h-60 overflow-y-auto p-2">
-                            {getUniqueValues(column.key).map((value) => (
-                              <label key={value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-sm">
+              {columns.map((column) => {
+                const uniqueValues = getUniqueValues(column.key);
+                const selectedValues = columnFilters[column.key] || [];
+                const allSelected = uniqueValues.length > 0 && uniqueValues.every((v) => selectedValues.includes(v));
+                const someSelected = selectedValues.length > 0 && !allSelected;
+                const showFilter =
+                  column.key !== 'description' &&
+                  column.key !== 'vendorUat' &&
+                  column.key !== 'vendorProd' &&
+                  column.key !== 'trusthubUat' &&
+                  column.key !== 'trusthubProd' &&
+                  column.key !== 'documentLink' &&
+                  column.key !== 'remarks';
+
+                return (
+                  <th
+                    key={column.key}
+                    className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200"
+                    style={{ minWidth: column.width }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{column.label}</span>
+                      {showFilter && (
+                        <div className="relative group">
+                          <button className="p-1 hover:bg-slate-200 rounded">
+                            <Filter
+                              size={14}
+                              className={selectedValues.length > 0 ? 'text-blue-600' : 'text-slate-400'}
+                            />
+                          </button>
+                          <div className="hidden group-hover:block absolute right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-20 min-w-[150px]">
+                            <div className="max-h-60 overflow-y-auto p-2">
+                              {/* Select All row */}
+                              <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-100 mb-1">
                                 <input
                                   type="checkbox"
-                                  checked={columnFilters[column.key]?.includes(value) || false}
-                                  onChange={() => handleColumnFilter(column.key, value)}
+                                  checked={allSelected}
+                                  ref={(el) => {
+                                    if (el) el.indeterminate = someSelected;
+                                  }}
+                                  onChange={() => handleSelectAll(column.key, uniqueValues)}
                                   className="rounded border-slate-300"
                                 />
-                                <span className="text-slate-700">{value}</span>
+                                <span className="text-slate-700 font-medium">Select All</span>
                               </label>
-                            ))}
+                              {/* Individual options */}
+                              {uniqueValues.map((value) => (
+                                <label
+                                  key={value}
+                                  className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer text-sm"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedValues.includes(value)}
+                                    onChange={() => handleColumnFilter(column.key, value)}
+                                    className="rounded border-slate-300"
+                                  />
+                                  <span className="text-slate-700">{value}</span>
+                                </label>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </th>
-              ))}
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
               <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200" style={{ minWidth: '150px' }}>
                 Actions
               </th>
@@ -210,51 +261,23 @@ export default function ViewPage() {
                 </td>
                 <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
                   {api.vendorUat ? (
-                    <button
-                      onClick={() => handleViewCurl('Vendor UAT — cURL', api.vendorUat!)}
-                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                    >
-                      View cURL
-                    </button>
-                  ) : (
-                    <span>—</span>
-                  )}
+                    <button onClick={() => handleViewCurl('Vendor UAT — cURL', api.vendorUat!)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">View cURL</button>
+                  ) : <span>—</span>}
                 </td>
                 <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
                   {api.vendorProd ? (
-                    <button
-                      onClick={() => handleViewCurl('Vendor Prod — cURL', api.vendorProd!)}
-                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                    >
-                      View cURL
-                    </button>
-                  ) : (
-                    <span>—</span>
-                  )}
+                    <button onClick={() => handleViewCurl('Vendor Prod — cURL', api.vendorProd!)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">View cURL</button>
+                  ) : <span>—</span>}
                 </td>
                 <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
                   {api.trusthubUat ? (
-                    <button
-                      onClick={() => handleViewCurl('TrustHub UAT — cURL', api.trusthubUat!)}
-                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                    >
-                      View cURL
-                    </button>
-                  ) : (
-                    <span>—</span>
-                  )}
+                    <button onClick={() => handleViewCurl('TrustHub UAT — cURL', api.trusthubUat!)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">View cURL</button>
+                  ) : <span>—</span>}
                 </td>
                 <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
                   {api.trusthubProd ? (
-                    <button
-                      onClick={() => handleViewCurl('TrustHub Prod — cURL', api.trusthubProd!)}
-                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                    >
-                      View cURL
-                    </button>
-                  ) : (
-                    <span>—</span>
-                  )}
+                    <button onClick={() => handleViewCurl('TrustHub Prod — cURL', api.trusthubProd!)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">View cURL</button>
+                  ) : <span>—</span>}
                 </td>
                 <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
                   <div className="max-w-[200px] truncate">{api.documentLink || '-'}</div>
@@ -263,23 +286,13 @@ export default function ViewPage() {
                   <div className="max-w-[200px] truncate">{api.remarks || '-'}</div>
                 </td>
                 <td className="px-4 py-2.5 text-sm border-b border-slate-200">
-                  <span
-                    className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
-                      api.status === 'active'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-slate-200 text-slate-600'
-                    }`}
-                  >
+                  <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${api.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}>
                     {api.status.charAt(0).toUpperCase() + api.status.slice(1)}
                   </span>
                 </td>
                 <td className="px-4 py-2.5 text-sm border-b border-slate-200">
                   <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleEdit(api)}
-                      className="p-1.5 hover:bg-slate-200 rounded transition-colors"
-                      title="Edit"
-                    >
+                    <button onClick={() => handleEdit(api)} className="p-1.5 hover:bg-slate-200 rounded transition-colors" title="Edit">
                       <Pencil size={16} className="text-blue-600" />
                     </button>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -297,9 +310,7 @@ export default function ViewPage() {
             ))}
             {filteredApis.length === 0 && (
               <tr>
-                <td colSpan={13} className="px-4 py-12 text-center text-slate-500">
-                  No APIs found
-                </td>
+                <td colSpan={13} className="px-4 py-12 text-center text-slate-500">No APIs found</td>
               </tr>
             )}
           </tbody>
@@ -307,37 +318,20 @@ export default function ViewPage() {
       </div>
 
       {showEditModal && editingApi && (
-        <ApiModal
-          mode="edit"
-          apiData={editingApi}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditingApi(null);
-          }}
-        />
+        <ApiModal mode="edit" apiData={editingApi} onClose={() => { setShowEditModal(false); setEditingApi(null); }} />
       )}
 
       {showConfirmDialog && confirmAction && (
         <ConfirmDialog
-          title={`Confirm Status Change`}
+          title="Confirm Status Change"
           message={`Are you sure you want to mark "${confirmAction.name}" as ${confirmAction.currentStatus === 'active' ? 'Inactive' : 'Active'}?`}
           onConfirm={confirmToggleStatus}
-          onCancel={() => {
-            setShowConfirmDialog(false);
-            setConfirmAction(null);
-          }}
+          onCancel={() => { setShowConfirmDialog(false); setConfirmAction(null); }}
         />
       )}
 
       {showCurlModal && curlModalData && (
-        <CurlModal
-          title={curlModalData.title}
-          curlCommand={curlModalData.command}
-          onClose={() => {
-            setShowCurlModal(false);
-            setCurlModalData(null);
-          }}
-        />
+        <CurlModal title={curlModalData.title} curlCommand={curlModalData.command} onClose={() => { setShowCurlModal(false); setCurlModalData(null); }} />
       )}
     </div>
   );
