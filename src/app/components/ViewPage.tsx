@@ -115,7 +115,7 @@ export default function ViewPage() {
     { key: 'vendorProd', label: 'Vendor Prod', width: '200px' },
     { key: 'trusthubUat', label: 'TrustHub UAT', width: '200px' },
     { key: 'trusthubProd', label: 'TrustHub Prod', width: '200px' },
-    { key: 'documentLink', label: 'Document Link', width: '300px' },
+    { key: 'documentLink', label: 'Document Link', width: '200px' },
     { key: 'remarks', label: 'Remarks', width: '200px' },
     { key: 'status', label: 'Status', width: '100px' },
   ];
@@ -342,9 +342,9 @@ export default function ViewPage() {
                       href={api.documentLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium break-all"
+                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
                     >
-                      {api.documentLink}
+                      View Document
                     </a>
                   ) : '-'}
                 </td>
