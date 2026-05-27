@@ -103,6 +103,7 @@ export default function ViewPage() {
   const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; currentStatus: string } | null>(null);
   const [showCurlModal, setShowCurlModal] = useState(false);
   const [curlModalData, setCurlModalData] = useState<{ title: string; command: string } | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const columns = [
     { key: 'jiraId', label: 'JIRA ID', width: '120px' },
@@ -114,7 +115,7 @@ export default function ViewPage() {
     { key: 'vendorProd', label: 'Vendor Prod', width: '200px' },
     { key: 'trusthubUat', label: 'TrustHub UAT', width: '200px' },
     { key: 'trusthubProd', label: 'TrustHub Prod', width: '200px' },
-    { key: 'documentLink', label: 'Document Link', width: '200px' },
+    { key: 'documentLink', label: 'Document Link', width: '300px' },
     { key: 'remarks', label: 'Remarks', width: '200px' },
     { key: 'status', label: 'Status', width: '100px' },
   ];
@@ -237,13 +238,22 @@ export default function ViewPage() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-slate-900">View APIs</h1>
-        <button
-          onClick={exportToExcel}
-          className="bg-green-600 text-white px-6 py-2.5 rounded-md font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
-        >
-          <Download size={18} />
-          Export to Excel
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 text-white px-6 py-2.5 rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <span className="text-xl">+</span>
+            Add New API
+          </button>
+          <button
+            onClick={exportToExcel}
+            className="bg-green-600 text-white px-6 py-2.5 rounded-md font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <Download size={18} />
+            Export to Excel
+          </button>
+        </div>
       </div>
 
       <div className="mb-6">
@@ -327,7 +337,16 @@ export default function ViewPage() {
                   ) : <span>—</span>}
                 </td>
                 <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
-                  <div className="max-w-[200px] truncate">{api.documentLink || '-'}</div>
+                  {api.documentLink ? (
+                    <a
+                      href={api.documentLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium break-all"
+                    >
+                      {api.documentLink}
+                    </a>
+                  ) : '-'}
                 </td>
                 <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
                   <div className="max-w-[200px] truncate">{api.remarks || '-'}</div>
