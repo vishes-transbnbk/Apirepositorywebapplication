@@ -399,6 +399,10 @@ export default function ViewPage() {
       {showCurlModal && curlModalData && (
         <CurlModal title={curlModalData.title} curlCommand={curlModalData.command} onClose={() => { setShowCurlModal(false); setCurlModalData(null); }} />
       )}
+
+      {showAddModal && (
+        <ApiModal mode="add" onClose={() => setShowAddModal(false)} />
+      )}
     </div>
   );
 }
