@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useApi, ApiGroup, ApiEndpoint } from '../contexts/ApiContext';
+import { useApi, ApiGroup } from '../contexts/ApiContext';
 import { Pencil, Filter, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ApiModal from './ApiModal';
@@ -91,7 +91,10 @@ function FilterDropdown({
 function CurlCell({ label, value, onView }: { label: string; value?: string; onView: (title: string, cmd: string) => void }) {
   if (!value) return <span className="text-slate-400">—</span>;
   return (
-    <button onClick={() => onView(label, value)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm">
+    <button
+      onClick={() => onView(label, value)}
+      className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm whitespace-nowrap"
+    >
       View cURL
     </button>
   );
@@ -118,18 +121,6 @@ export default function ViewPage() {
       return next;
     });
   };
-
-  const groupColumns = [
-    { key: 'jiraId', label: 'JIRA ID', width: '120px', filterable: true },
-    { key: 'name', label: 'Name', width: '180px', filterable: true },
-    { key: 'vendor', label: 'Vendor', width: '140px', filterable: true },
-    { key: 'type', label: 'Type', width: '100px', filterable: true },
-    { key: 'description', label: 'Description', width: '220px', filterable: false },
-    { key: 'endpoints', label: 'Endpoints', width: '100px', filterable: false },
-    { key: 'documentLink', label: 'Document', width: '130px', filterable: false },
-    { key: 'remarks', label: 'Remarks', width: '180px', filterable: false },
-    { key: 'status', label: 'Status', width: '100px', filterable: true },
-  ];
 
   const filteredGroups = useMemo(() => {
     let result = apiGroups;
@@ -243,6 +234,14 @@ export default function ViewPage() {
     setShowCurlModal(true);
   };
 
+  const filterableCols = [
+    { key: 'jiraId',  label: 'JIRA ID'     },
+    { key: 'name',    label: 'Name'         },
+    { key: 'vendor',  label: 'Vendor'       },
+    { key: 'type',    label: 'Type'         },
+    { key: 'status',  label: 'Status'       },
+  ];
+
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
@@ -276,95 +275,141 @@ export default function ViewPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table className="w-full border-collapse text-sm">
           <thead className="bg-slate-100 sticky top-0 z-10">
             <tr>
-              {/* Expand toggle column */}
+              {/* expand toggle */}
               <th className="px-3 py-3 border-b border-slate-200 w-10" />
-              {groupColumns.map((col) => (
+
+              {/* filterable group columns */}
+              {filterableCols.map((col) => (
                 <th
                   key={col.key}
-                  className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200"
-                  style={{ minWidth: col.width }}
+                  className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 whitespace-nowrap"
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
                     <span>{col.label}</span>
-                    {col.filterable && (
-                      <FilterDropdown
-                        columnKey={col.key}
-                        uniqueValues={getUniqueValues(col.key)}
-                        selectedValues={columnFilters[col.key] || []}
-                        onToggle={handleColumnFilter}
-                        onSelectAll={handleSelectAll}
-                      />
-                    )}
+                    <FilterDropdown
+                      columnKey={col.key}
+                      uniqueValues={getUniqueValues(col.key)}
+                      selectedValues={columnFilters[col.key] || []}
+                      onToggle={handleColumnFilter}
+                      onSelectAll={handleSelectAll}
+                    />
                   </div>
                 </th>
               ))}
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200" style={{ minWidth: '120px' }}>
-                Actions
-              </th>
+
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 min-w-[200px]">Description</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-24">Endpoints</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">Vendor UAT</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">Vendor Prod</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">TrustHub UAT</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">TrustHub Prod</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-24">Document</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 min-w-[160px]">Remarks</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {filteredGroups.map((group, index) => {
               const isExpanded = expandedGroups.has(group.id);
-              const hasEndpoints = group.endpoints.length > 0;
+              const epCount = group.endpoints.length;
+              const isSingle = epCount === 1;
+              const isMulti = epCount > 1;
               const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+              const ep0 = group.endpoints[0]; // used for single-endpoint inline display
 
               return (
                 <>
-                  {/* Parent row */}
+                  {/* ── Parent / group row ── */}
                   <tr key={group.id} className={`${rowBg} hover:bg-blue-50/30 transition-colors`}>
-                    {/* Expand cell */}
+
+                    {/* Expand chevron — only for multi-endpoint groups */}
                     <td className="px-3 py-2.5 border-b border-slate-200">
-                      {hasEndpoints && (
+                      {isMulti && (
                         <button
                           onClick={() => toggleExpand(group.id)}
                           className="p-1 hover:bg-slate-200 rounded transition-colors"
                         >
                           {isExpanded
                             ? <ChevronDown size={15} className="text-slate-500" />
-                            : <ChevronRight size={15} className="text-slate-500" />
-                          }
+                            : <ChevronRight size={15} className="text-slate-500" />}
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">{group.jiraId || '—'}</td>
-                    <td className="px-4 py-2.5 text-sm text-slate-900 font-semibold border-b border-slate-200">{group.name}</td>
-                    <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">{group.vendor}</td>
-                    <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">{group.type}</td>
-                    <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
-                      <div className="max-w-[220px] truncate">{group.description || '—'}</div>
+
+                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">{group.jiraId || '—'}</td>
+                    <td className="px-4 py-2.5 border-b border-slate-200 font-semibold text-slate-900">{group.name}</td>
+                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">{group.vendor}</td>
+                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">{group.type}</td>
+
+                    {/* Status badge */}
+                    <td className="px-4 py-2.5 border-b border-slate-200">
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${group.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}>
+                        {group.status.charAt(0).toUpperCase() + group.status.slice(1)}
+                      </span>
                     </td>
-                    <td className="px-4 py-2.5 text-sm border-b border-slate-200">
-                      {hasEndpoints ? (
+
+                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
+                      <div className="max-w-[200px] truncate">{group.description || '—'}</div>
+                    </td>
+
+                    {/* Endpoint count */}
+                    <td className="px-4 py-2.5 border-b border-slate-200">
+                      {epCount === 0 ? (
+                        <span className="text-slate-400">—</span>
+                      ) : isMulti ? (
                         <button
                           onClick={() => toggleExpand(group.id)}
-                          className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
+                          className="text-indigo-600 hover:text-indigo-800 font-medium"
                         >
-                          <span>{group.endpoints.length} endpoint{group.endpoints.length !== 1 ? 's' : ''}</span>
+                          {epCount} endpoints
                         </button>
                       ) : (
-                        <span className="text-slate-400 text-sm">—</span>
+                        <span className="text-slate-600">1</span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
+
+                    {/* cURL columns:
+                        - single endpoint → show links directly on parent row
+                        - multi endpoint  → blank (links shown on child rows)
+                        - no endpoints    → dash */}
+                    <td className="px-4 py-2.5 border-b border-slate-200">
+                      {isSingle
+                        ? <CurlCell label={`${group.name} — Vendor UAT`} value={ep0.vendorUat} onView={handleViewCurl} />
+                        : <span className="text-slate-400">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 border-b border-slate-200">
+                      {isSingle
+                        ? <CurlCell label={`${group.name} — Vendor Prod`} value={ep0.vendorProd} onView={handleViewCurl} />
+                        : <span className="text-slate-400">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 border-b border-slate-200">
+                      {isSingle
+                        ? <CurlCell label={`${group.name} — TrustHub UAT`} value={ep0.trusthubUat} onView={handleViewCurl} />
+                        : <span className="text-slate-400">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 border-b border-slate-200">
+                      {isSingle
+                        ? <CurlCell label={`${group.name} — TrustHub Prod`} value={ep0.trusthubProd} onView={handleViewCurl} />
+                        : <span className="text-slate-400">—</span>}
+                    </td>
+
+                    <td className="px-4 py-2.5 border-b border-slate-200">
                       {group.documentLink ? (
                         <a href={group.documentLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
                           View Doc
                         </a>
                       ) : '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
-                      <div className="max-w-[180px] truncate">{group.remarks || '—'}</div>
+
+                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
+                      <div className="max-w-[160px] truncate">{group.remarks || '—'}</div>
                     </td>
-                    <td className="px-4 py-2.5 text-sm border-b border-slate-200">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${group.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}>
-                        {group.status.charAt(0).toUpperCase() + group.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-sm border-b border-slate-200">
+
+                    <td className="px-4 py-2.5 border-b border-slate-200">
                       <div className="flex items-center gap-3">
                         <button onClick={() => handleEdit(group)} className="p-1.5 hover:bg-slate-200 rounded transition-colors" title="Edit">
                           <Pencil size={16} className="text-blue-600" />
@@ -382,13 +427,16 @@ export default function ViewPage() {
                     </td>
                   </tr>
 
-                  {/* Endpoint child rows */}
-                  {isExpanded && hasEndpoints && group.endpoints.map((ep, epIdx) => (
-                    <tr key={ep.id} className="bg-indigo-50/40 border-b border-indigo-100">
+                  {/* ── Child rows — only for multi-endpoint groups when expanded ── */}
+                  {isMulti && isExpanded && group.endpoints.map((ep, epIdx) => (
+                    <tr key={ep.id} className="bg-indigo-50/40">
+                      {/* empty expand cell */}
                       <td className="border-b border-indigo-100" />
-                      {/* JIRA ID — empty for child */}
-                      <td className="px-4 py-2 border-b border-indigo-100" />
-                      {/* Endpoint name indented */}
+
+                      {/* JIRA ID empty */}
+                      <td className="border-b border-indigo-100" />
+
+                      {/* Endpoint name, indented under Name column */}
                       <td className="px-4 py-2 border-b border-indigo-100">
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-px bg-indigo-300 shrink-0" />
@@ -397,45 +445,43 @@ export default function ViewPage() {
                           </span>
                         </div>
                       </td>
-                      {/* Vendor, Type, Description — inherited, show dash */}
-                      <td className="px-4 py-2 border-b border-indigo-100" />
-                      <td className="px-4 py-2 border-b border-indigo-100" />
-                      <td className="px-4 py-2 border-b border-indigo-100" />
-                      {/* Endpoints count — show cURL links here */}
+
+                      {/* Vendor, Type, Status, Description — blank on child rows */}
+                      <td className="border-b border-indigo-100" />
+                      <td className="border-b border-indigo-100" />
+                      <td className="border-b border-indigo-100" />
+                      <td className="border-b border-indigo-100" />
+
+                      {/* Endpoints count — blank on child rows */}
+                      <td className="border-b border-indigo-100" />
+
+                      {/* 4 cURL columns on child rows */}
                       <td className="px-4 py-2 border-b border-indigo-100">
-                        <div className="flex flex-col gap-1">
-                          {ep.vendorUat && (
-                            <CurlCell label={`${ep.name || 'Endpoint'} — Vendor UAT`} value={ep.vendorUat} onView={handleViewCurl} />
-                          )}
-                          {ep.vendorProd && (
-                            <span className="text-xs text-slate-400">
-                              <CurlCell label={`${ep.name || 'Endpoint'} — Vendor Prod`} value={ep.vendorProd} onView={handleViewCurl} />
-                            </span>
-                          )}
-                          {ep.trusthubUat && (
-                            <CurlCell label={`${ep.name || 'Endpoint'} — TrustHub UAT`} value={ep.trusthubUat} onView={handleViewCurl} />
-                          )}
-                          {ep.trusthubProd && (
-                            <CurlCell label={`${ep.name || 'Endpoint'} — TrustHub Prod`} value={ep.trusthubProd} onView={handleViewCurl} />
-                          )}
-                          {!ep.vendorUat && !ep.vendorProd && !ep.trusthubUat && !ep.trusthubProd && (
-                            <span className="text-slate-400 text-sm">No cURLs</span>
-                          )}
-                        </div>
+                        <CurlCell label={`${ep.name || `Endpoint ${epIdx + 1}`} — Vendor UAT`} value={ep.vendorUat} onView={handleViewCurl} />
                       </td>
-                      {/* Doc, Remarks, Status, Actions — empty for child rows */}
-                      <td className="px-4 py-2 border-b border-indigo-100" />
-                      <td className="px-4 py-2 border-b border-indigo-100" />
-                      <td className="px-4 py-2 border-b border-indigo-100" />
-                      <td className="px-4 py-2 border-b border-indigo-100" />
+                      <td className="px-4 py-2 border-b border-indigo-100">
+                        <CurlCell label={`${ep.name || `Endpoint ${epIdx + 1}`} — Vendor Prod`} value={ep.vendorProd} onView={handleViewCurl} />
+                      </td>
+                      <td className="px-4 py-2 border-b border-indigo-100">
+                        <CurlCell label={`${ep.name || `Endpoint ${epIdx + 1}`} — TrustHub UAT`} value={ep.trusthubUat} onView={handleViewCurl} />
+                      </td>
+                      <td className="px-4 py-2 border-b border-indigo-100">
+                        <CurlCell label={`${ep.name || `Endpoint ${epIdx + 1}`} — TrustHub Prod`} value={ep.trusthubProd} onView={handleViewCurl} />
+                      </td>
+
+                      {/* Document, Remarks, Actions — blank on child rows */}
+                      <td className="border-b border-indigo-100" />
+                      <td className="border-b border-indigo-100" />
+                      <td className="border-b border-indigo-100" />
                     </tr>
                   ))}
                 </>
               );
             })}
+
             {filteredGroups.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 py-12 text-center text-slate-500">No APIs found</td>
+                <td colSpan={15} className="px-4 py-12 text-center text-slate-500">No APIs found</td>
               </tr>
             )}
           </tbody>
