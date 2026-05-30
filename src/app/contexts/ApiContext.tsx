@@ -160,7 +160,6 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       if (eErr) console.error('Error adding endpoints:', eErr);
     }
 
-    const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) await fetchAll(session.user.id);
   };
 
