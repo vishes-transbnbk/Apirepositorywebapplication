@@ -1,16 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  }
-);
+import { supabase } from '../lib/supabaseClient';
 
 export interface ApiEndpoint {
   id: string;
@@ -171,7 +160,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       if (eErr) console.error('Error adding endpoints:', eErr);
     }
 
-    await fetchAll();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) await fetchAll(session.user.id);
   };
 
   const updateApiGroup = async (id: string, group: NewApiGroup) => {
@@ -206,7 +196,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       if (eErr) console.error('Error updating endpoints:', eErr);
     }
 
-    await fetchAll();
+     const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) await fetchAll(session.user.id);
   };
 
   const deleteApiGroup = async (id: string) => {
@@ -214,7 +205,10 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     await supabase.from('api_endpoints').delete().eq('group_id', id);
     const { error } = await supabase.from('api_groups').delete().eq('id', id);
     if (error) console.error('Error deleting api_group:', error);
-    else await fetchAll();
+   else {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) await fetchAll(session.user.id);
+    }
   };
 
   const toggleStatus = async (id: string) => {
@@ -226,7 +220,10 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     }).eq('id', id);
 
     if (error) console.error('Error toggling status:', error);
-    else await fetchAll();
+    else {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) await fetchAll(session.user.id);
+    }
   };
 
   const checkDuplicate = (name: string, vendor: string, excludeId?: string): boolean => {

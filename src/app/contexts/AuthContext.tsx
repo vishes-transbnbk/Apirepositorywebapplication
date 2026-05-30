@@ -1,17 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabaseClient';
 import { useInactivityTimer } from '../hooks/useInactivityTimer';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: false,  // logs out on tab close
-      autoRefreshToken: false,
-    },
-  }
-);
 
 interface User {
   email: string;
