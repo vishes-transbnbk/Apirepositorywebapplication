@@ -51,16 +51,27 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   const [apiGroups, setApiGroups] = useState<ApiGroup[]>([]);
 
   const fetchAll = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
     const { data: groups, error: gErr } = await supabase
       .from('api_groups')
       .select('*')
+      .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
 
     if (gErr) { console.error('Error fetching api_groups:', gErr); return; }
 
+    const groupIds = (groups ?? []).map((g: any) => g.id);
+    if (groupIds.length === 0) {
+      setApiGroups([]);
+      return;
+    }
+
     const { data: endpoints, error: eErr } = await supabase
       .from('api_endpoints')
       .select('*')
+      .in('group_id', groupIds)
       .order('created_at', { ascending: true });
 
     if (eErr) { console.error('Error fetching api_endpoints:', eErr); return; }
