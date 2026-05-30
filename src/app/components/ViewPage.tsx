@@ -397,13 +397,15 @@ export default function ViewPage() {
                         : <span className="text-slate-400">—</span>}
                     </td>
 
-                    <td className="px-4 py-2.5 border-b border-slate-200">
-                      {group.documentLink ? (
-                        <a href={group.documentLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
-                          View Doc
-                        </a>
-                      ) : '—'}
-                    </td>
+                   <td className="px-4 py-2.5 border-b border-slate-200">
+  {group.documentLink && group.documentLink.startsWith('https://') ? (
+    <a href={group.documentLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
+      View Doc
+    </a>
+  ) : group.documentLink ? (
+    <span className="text-slate-400 text-xs">Invalid URL</span>
+  ) : '—'}
+</td>
 
                     <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
                       <div className="max-w-[160px] truncate">{group.remarks || '—'}</div>
