@@ -56,14 +56,11 @@ const ApiContext = createContext<ApiContextType | undefined>(undefined);
 export function ApiProvider({ children }: { children: ReactNode }) {
   const [apiGroups, setApiGroups] = useState<ApiGroup[]>([]);
 
-  const fetchAll = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-
+  const fetchAll = async (userId: string) => {
     const { data: groups, error: gErr } = await supabase
       .from('api_groups')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (gErr) { console.error('Error fetching api_groups:', gErr); return; }
@@ -112,18 +109,26 @@ export function ApiProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      if (session?.user) fetchAll();
+      if (session?.user) fetchAll(session.user.id);
       else setApiGroups([]);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) fetchAll();
+      if (session?.user) fetchAll(session.user.id);
     });
 
     const channel = supabase
       .channel('api-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'api_groups' }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'api_endpoints' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'api_groups' }, () => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) fetchAll(session.user.id);
+        });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'api_endpoints' }, () => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) fetchAll(session.user.id);
+        });
+      })
       .subscribe();
 
     return () => {
