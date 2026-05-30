@@ -1,9 +1,16 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { useInactivityTimer } from '../hooks/useInactivityTimer';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: false,  // logs out on tab close
+      autoRefreshToken: false,
+    },
+  }
 );
 
 interface User {
@@ -22,15 +29,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.email) {
-        setUser({ email: session.user.email });
-      }
-    });
+  const logout = useCallback(() => {
+    supabase.auth.signOut();
+    setUser(null);
+  }, []);
 
-    // Listen for auth changes
+  // Log out after 30 minutes of inactivity
+  useInactivityTimer(logout);
+
+  useEffect(() => {
+    // No session persistence, so no need to check existing session
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user?.email) {
         setUser({ email: session.user.email });
@@ -50,11 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) throw new Error(error.message);
-  };
-
-  const logout = () => {
-    supabase.auth.signOut();
-    setUser(null);
   };
 
   return (
