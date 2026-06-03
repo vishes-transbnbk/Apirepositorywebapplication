@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useApi, ApiGroup } from '../contexts/ApiContext';
-import { Pencil, Filter, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { useApi, ApiRecord } from '../contexts/ApiContext';
+import { Pencil, Filter, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ApiModal from './ApiModal';
 import ConfirmDialog from './ConfirmDialog';
@@ -31,21 +31,26 @@ function FilterDropdown({
   const handleOpen = () => {
     if (btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + window.scrollY + 4, left: Math.max(0, rect.right + window.scrollX - 150) });
+      setPos({
+        top: rect.bottom + window.scrollY + 4,
+        left: Math.max(0, rect.right + window.scrollX - 150),
+      });
     }
     setOpen((o) => !o);
   };
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent) => {
       if (
         dropRef.current && !dropRef.current.contains(e.target as Node) &&
         btnRef.current && !btnRef.current.contains(e.target as Node)
-      ) setOpen(false);
+      ) {
+        setOpen(false);
+      }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
   return (
@@ -88,135 +93,130 @@ function FilterDropdown({
   );
 }
 
-function CurlCell({ label, value, onView }: { label: string; value?: string; onView: (title: string, cmd: string) => void }) {
-  if (!value) return <span className="text-slate-400">—</span>;
-  return (
-    <button
-      onClick={() => onView(label, value)}
-      className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm whitespace-nowrap"
-    >
-      View cURL
-    </button>
-  );
-}
-
 export default function ViewPage() {
-  const { apiGroups, toggleStatus } = useApi();
+  const { apis, toggleStatus } = useApi();
   const [searchQuery, setSearchQuery] = useState('');
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingApi, setEditingApi] = useState<ApiGroup | null>(null);
+  const [editingApi, setEditingApi] = useState<ApiRecord | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; currentStatus: string } | null>(null);
   const [showCurlModal, setShowCurlModal] = useState(false);
   const [curlModalData, setCurlModalData] = useState<{ title: string; command: string } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const toggleExpand = (id: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const columns = [
+    { key: 'jiraId', label: 'JIRA ID', width: '120px' },
+    { key: 'name', label: 'Name', width: '200px' },
+    { key: 'vendor', label: 'Vendor', width: '150px' },
+    { key: 'type', label: 'Type', width: '100px' },
+    { key: 'description', label: 'Description', width: '250px' },
+    { key: 'vendorUat', label: 'Vendor UAT', width: '200px' },
+    { key: 'vendorProd', label: 'Vendor Prod', width: '200px' },
+    { key: 'trusthubUat', label: 'TrustHub UAT', width: '200px' },
+    { key: 'trusthubProd', label: 'TrustHub Prod', width: '200px' },
+    { key: 'documentLink', label: 'Document Link', width: '200px' },
+    { key: 'remarks', label: 'Remarks', width: '200px' },
+    { key: 'status', label: 'Status', width: '100px' },
+  ];
 
-  const filteredGroups = useMemo(() => {
-    let result = apiGroups;
+  const filteredApis = useMemo(() => {
+    let result = apis;
+
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase();
       result = result.filter(
-        (g) =>
-          g.name.toLowerCase().includes(q) ||
-          g.vendor.toLowerCase().includes(q) ||
-          g.type.toLowerCase().includes(q) ||
-          g.jiraId?.toLowerCase().includes(q) ||
-          g.endpoints.some((ep) => ep.name.toLowerCase().includes(q))
+        (api) =>
+          api.name.toLowerCase().includes(query) ||
+          api.vendor.toLowerCase().includes(query) ||
+          api.type.toLowerCase().includes(query) ||
+          api.jiraId?.toLowerCase().includes(query)
       );
     }
-    Object.entries(columnFilters).forEach(([col, vals]) => {
-      if (vals.length > 0) {
-        result = result.filter((g) => vals.includes(String(g[col as keyof ApiGroup] || '')));
+
+    Object.entries(columnFilters).forEach(([column, values]) => {
+      if (values.length > 0) {
+        result = result.filter((api) => {
+          const value = api[column as keyof ApiRecord];
+          return values.includes(String(value || ''));
+        });
       }
     });
-    return result;
-  }, [apiGroups, searchQuery, columnFilters]);
 
-  const getUniqueValues = (col: string): string[] => {
-    const vals = apiGroups.map((g) => String(g[col as keyof ApiGroup] || '')).filter(Boolean);
-    return Array.from(new Set(vals)).sort();
+    return result;
+  }, [apis, searchQuery, columnFilters]);
+
+  const getUniqueValues = (column: string): string[] => {
+    const values = apis.map((api) => String(api[column as keyof ApiRecord] || '')).filter(Boolean);
+    return Array.from(new Set(values)).sort();
   };
 
-  const handleColumnFilter = (col: string, val: string) => {
+  const handleColumnFilter = (column: string, value: string) => {
     setColumnFilters((prev) => {
-      const cur = prev[col] || [];
-      const next = cur.includes(val) ? cur.filter((v) => v !== val) : [...cur, val];
-      if (next.length === 0) { const { [col]: _, ...rest } = prev; return rest; }
-      return { ...prev, [col]: next };
+      const currentValues = prev[column] || [];
+      const newValues = currentValues.includes(value)
+        ? currentValues.filter((v) => v !== value)
+        : [...currentValues, value];
+
+      if (newValues.length === 0) {
+        const { [column]: removed, ...rest } = prev;
+        return rest;
+      }
+
+      return { ...prev, [column]: newValues };
     });
   };
 
-  const handleSelectAll = (col: string, allVals: string[]) => {
+  const handleSelectAll = (column: string, allValues: string[]) => {
     setColumnFilters((prev) => {
-      const cur = prev[col] || [];
-      const allSelected = allVals.every((v) => cur.includes(v));
-      if (allSelected) { const { [col]: _, ...rest } = prev; return rest; }
-      return { ...prev, [col]: allVals };
+      const currentValues = prev[column] || [];
+      const allSelected = allValues.every((v) => currentValues.includes(v));
+
+      if (allSelected) {
+        const { [column]: removed, ...rest } = prev;
+        return rest;
+      } else {
+        return { ...prev, [column]: allValues };
+      }
     });
   };
 
   const exportToExcel = () => {
-    const rows: Record<string, string>[] = [];
-    apiGroups.forEach((g) => {
-      if (g.endpoints.length === 0) {
-        rows.push({
-          'JIRA ID': g.jiraId || '',
-          'API Name': g.name,
-          'Endpoint': '',
-          'Vendor': g.vendor,
-          'Type': g.type,
-          'Description': g.description || '',
-          'Vendor UAT': '',
-          'Vendor Prod': '',
-          'TrustHub UAT': '',
-          'TrustHub Prod': '',
-          'Document Link': g.documentLink || '',
-          'Remarks': g.remarks || '',
-          'Status': g.status.charAt(0).toUpperCase() + g.status.slice(1),
-        });
-      } else {
-        g.endpoints.forEach((ep) => {
-          rows.push({
-            'JIRA ID': g.jiraId || '',
-            'API Name': g.name,
-            'Endpoint': ep.name,
-            'Vendor': g.vendor,
-            'Type': g.type,
-            'Description': g.description || '',
-            'Vendor UAT': ep.vendorUat || '',
-            'Vendor Prod': ep.vendorProd || '',
-            'TrustHub UAT': ep.trusthubUat || '',
-            'TrustHub Prod': ep.trusthubProd || '',
-            'Document Link': g.documentLink || '',
-            'Remarks': g.remarks || '',
-            'Status': g.status.charAt(0).toUpperCase() + g.status.slice(1),
-          });
-        });
-      }
-    });
+    const exportData = apis.map((api) => ({
+      'JIRA ID': api.jiraId || '',
+      'Name': api.name,
+      'Vendor': api.vendor,
+      'Type': api.type,
+      'Description': api.description || '',
+      'Vendor UAT': api.vendorUat || '',
+      'Vendor Prod': api.vendorProd || '',
+      'TrustHub UAT': api.trusthubUat || '',
+      'TrustHub Prod': api.trusthubProd || '',
+      'Document Link': api.documentLink || '',
+      'Remarks': api.remarks || '',
+      'Status': api.status.charAt(0).toUpperCase() + api.status.slice(1),
+    }));
 
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'API Repository');
-    XLSX.writeFile(wb, `API_Repository_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    const today = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `API_Repository_Export_${today}.xlsx`);
     toast.success('Export completed successfully');
   };
 
-  const handleEdit = (g: ApiGroup) => { setEditingApi(g); setShowEditModal(true); };
+  const handleEdit = (api: ApiRecord) => {
+    setEditingApi(api);
+    setShowEditModal(true);
+  };
 
-  const handleToggleStatus = (g: ApiGroup) => {
-    setConfirmAction({ id: g.id, name: g.name, currentStatus: g.status });
+  const handleToggleStatus = (api: ApiRecord) => {
+    setConfirmAction({
+      id: api.id,
+      name: api.name,
+      currentStatus: api.status,
+    });
     setShowConfirmDialog(true);
   };
 
@@ -233,14 +233,6 @@ export default function ViewPage() {
     setCurlModalData({ title, command });
     setShowCurlModal(true);
   };
-
-  const filterableCols = [
-    { key: 'jiraId',  label: 'JIRA ID'     },
-    { key: 'name',    label: 'Name'         },
-    { key: 'vendor',  label: 'Vendor'       },
-    { key: 'type',    label: 'Type'         },
-    { key: 'status',  label: 'Status'       },
-  ];
 
   return (
     <div className="p-8">
@@ -267,223 +259,124 @@ export default function ViewPage() {
       <div className="mb-6">
         <input
           type="text"
-          placeholder="Search by Name, Vendor, Type, JIRA ID, or Endpoint..."
+          placeholder="Search by Name, Vendor, Type, or JIRA ID..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-2.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse">
           <thead className="bg-slate-100 sticky top-0 z-10">
             <tr>
-              {/* expand toggle */}
-              <th className="px-3 py-3 border-b border-slate-200 w-10" />
+              {columns.map((column) => {
+                const showFilter =
+                  column.key !== 'description' &&
+                  column.key !== 'vendorUat' &&
+                  column.key !== 'vendorProd' &&
+                  column.key !== 'trusthubUat' &&
+                  column.key !== 'trusthubProd' &&
+                  column.key !== 'documentLink' &&
+                  column.key !== 'remarks';
 
-              {/* filterable group columns */}
-              {filterableCols.map((col) => (
-                <th
-                  key={col.key}
-                  className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 whitespace-nowrap"
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{col.label}</span>
-                    <FilterDropdown
-                      columnKey={col.key}
-                      uniqueValues={getUniqueValues(col.key)}
-                      selectedValues={columnFilters[col.key] || []}
-                      onToggle={handleColumnFilter}
-                      onSelectAll={handleSelectAll}
-                    />
-                  </div>
-                </th>
-              ))}
-
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 min-w-[200px]">Description</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-24">Endpoints</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">Vendor UAT</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">Vendor Prod</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">TrustHub UAT</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">TrustHub Prod</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-24">Document</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 min-w-[160px]">Remarks</th>
-              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">Actions</th>
+                return (
+                  <th
+                    key={column.key}
+                    className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200"
+                    style={{ minWidth: column.width }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{column.label}</span>
+                      {showFilter && (
+                        <FilterDropdown
+                          columnKey={column.key}
+                          uniqueValues={getUniqueValues(column.key)}
+                          selectedValues={columnFilters[column.key] || []}
+                          onToggle={handleColumnFilter}
+                          onSelectAll={handleSelectAll}
+                        />
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
+              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b border-slate-200" style={{ minWidth: '150px' }}>
+                Actions
+              </th>
             </tr>
           </thead>
-
           <tbody>
-            {filteredGroups.map((group, index) => {
-              const isExpanded = expandedGroups.has(group.id);
-              const epCount = group.endpoints.length;
-              const isSingle = epCount === 1;
-              const isMulti = epCount > 1;
-              const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50';
-              const ep0 = group.endpoints[0]; // used for single-endpoint inline display
-
-              return (
-                <>
-                  {/* ── Parent / group row ── */}
-                  <tr key={group.id} className={`${rowBg} hover:bg-blue-50/30 transition-colors`}>
-
-                    {/* Expand chevron — only for multi-endpoint groups */}
-                    <td className="px-3 py-2.5 border-b border-slate-200">
-                      {isMulti && (
-                        <button
-                          onClick={() => toggleExpand(group.id)}
-                          className="p-1 hover:bg-slate-200 rounded transition-colors"
-                        >
-                          {isExpanded
-                            ? <ChevronDown size={15} className="text-slate-500" />
-                            : <ChevronRight size={15} className="text-slate-500" />}
-                        </button>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">{group.jiraId || '—'}</td>
-                    <td className="px-4 py-2.5 border-b border-slate-200 font-semibold text-slate-900">{group.name}</td>
-                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">{group.vendor}</td>
-                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">{group.type}</td>
-
-                    {/* Status badge */}
-                    <td className="px-4 py-2.5 border-b border-slate-200">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${group.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}>
-                        {group.status.charAt(0).toUpperCase() + group.status.slice(1)}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
-                      <div className="max-w-[200px] truncate">{group.description || '—'}</div>
-                    </td>
-
-                    {/* Endpoint count */}
-                    <td className="px-4 py-2.5 border-b border-slate-200">
-                      {epCount === 0 ? (
-                        <span className="text-slate-400">—</span>
-                      ) : isMulti ? (
-                        <button
-                          onClick={() => toggleExpand(group.id)}
-                          className="text-indigo-600 hover:text-indigo-800 font-medium"
-                        >
-                          {epCount} endpoints
-                        </button>
-                      ) : (
-                        <span className="text-slate-600">1</span>
-                      )}
-                    </td>
-
-                    {/* cURL columns:
-                        - single endpoint → show links directly on parent row
-                        - multi endpoint  → blank (links shown on child rows)
-                        - no endpoints    → dash */}
-                    <td className="px-4 py-2.5 border-b border-slate-200">
-                      {isSingle
-                        ? <CurlCell label={`${group.name} — Vendor UAT`} value={ep0.vendorUat} onView={handleViewCurl} />
-                        : <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5 border-b border-slate-200">
-                      {isSingle
-                        ? <CurlCell label={`${group.name} — Vendor Prod`} value={ep0.vendorProd} onView={handleViewCurl} />
-                        : <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5 border-b border-slate-200">
-                      {isSingle
-                        ? <CurlCell label={`${group.name} — TrustHub UAT`} value={ep0.trusthubUat} onView={handleViewCurl} />
-                        : <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5 border-b border-slate-200">
-                      {isSingle
-                        ? <CurlCell label={`${group.name} — TrustHub Prod`} value={ep0.trusthubProd} onView={handleViewCurl} />
-                        : <span className="text-slate-400">—</span>}
-                    </td>
-
-                   <td className="px-4 py-2.5 border-b border-slate-200">
-  {group.documentLink && group.documentLink.startsWith('https://') ? (
-    <a href={group.documentLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
-      View Doc
-    </a>
-  ) : group.documentLink ? (
-    <span className="text-slate-400 text-xs">Invalid URL</span>
-  ) : '—'}
-</td>
-
-                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
-                      <div className="max-w-[160px] truncate">{group.remarks || '—'}</div>
-                    </td>
-
-                    <td className="px-4 py-2.5 border-b border-slate-200">
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => handleEdit(group)} className="p-1.5 hover:bg-slate-200 rounded transition-colors" title="Edit">
-                          <Pencil size={16} className="text-blue-600" />
-                        </button>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={group.status === 'active'}
-                            onChange={() => handleToggleStatus(group)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600" />
-                        </label>
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* ── Child rows — only for multi-endpoint groups when expanded ── */}
-                  {isMulti && isExpanded && group.endpoints.map((ep, epIdx) => (
-                    <tr key={ep.id} className="bg-indigo-50/40">
-                      {/* empty expand cell */}
-                      <td className="border-b border-indigo-100" />
-
-                      {/* JIRA ID empty */}
-                      <td className="border-b border-indigo-100" />
-
-                      {/* Endpoint name, indented under Name column */}
-                      <td className="px-4 py-2 border-b border-indigo-100">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-px bg-indigo-300 shrink-0" />
-                          <span className="text-sm text-indigo-800 font-medium">
-                            {ep.name || `Endpoint ${epIdx + 1}`}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Vendor, Type, Status, Description — blank on child rows */}
-                      <td className="border-b border-indigo-100" />
-                      <td className="border-b border-indigo-100" />
-                      <td className="border-b border-indigo-100" />
-                      <td className="border-b border-indigo-100" />
-
-                      {/* Endpoints count — blank on child rows */}
-                      <td className="border-b border-indigo-100" />
-
-                      {/* 4 cURL columns on child rows */}
-                      <td className="px-4 py-2 border-b border-indigo-100">
-                        <CurlCell label={`${ep.name || `Endpoint ${epIdx + 1}`} — Vendor UAT`} value={ep.vendorUat} onView={handleViewCurl} />
-                      </td>
-                      <td className="px-4 py-2 border-b border-indigo-100">
-                        <CurlCell label={`${ep.name || `Endpoint ${epIdx + 1}`} — Vendor Prod`} value={ep.vendorProd} onView={handleViewCurl} />
-                      </td>
-                      <td className="px-4 py-2 border-b border-indigo-100">
-                        <CurlCell label={`${ep.name || `Endpoint ${epIdx + 1}`} — TrustHub UAT`} value={ep.trusthubUat} onView={handleViewCurl} />
-                      </td>
-                      <td className="px-4 py-2 border-b border-indigo-100">
-                        <CurlCell label={`${ep.name || `Endpoint ${epIdx + 1}`} — TrustHub Prod`} value={ep.trusthubProd} onView={handleViewCurl} />
-                      </td>
-
-                      {/* Document, Remarks, Actions — blank on child rows */}
-                      <td className="border-b border-indigo-100" />
-                      <td className="border-b border-indigo-100" />
-                      <td className="border-b border-indigo-100" />
-                    </tr>
-                  ))}
-                </>
-              );
-            })}
-
-            {filteredGroups.length === 0 && (
+            {filteredApis.map((api, index) => (
+              <tr key={api.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">{api.jiraId || '-'}</td>
+                <td className="px-4 py-2.5 text-sm text-slate-900 font-medium border-b border-slate-200">{api.name}</td>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">{api.vendor}</td>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">{api.type}</td>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
+                  <div className="max-w-[250px] whitespace-normal break-words">{api.description || '-'}</div>
+                </td>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
+                  {api.vendorUat ? (
+                    <button onClick={() => handleViewCurl('Vendor UAT — cURL', api.vendorUat!)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">View cURL</button>
+                  ) : <span>—</span>}
+                </td>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
+                  {api.vendorProd ? (
+                    <button onClick={() => handleViewCurl('Vendor Prod — cURL', api.vendorProd!)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">View cURL</button>
+                  ) : <span>—</span>}
+                </td>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
+                  {api.trusthubUat ? (
+                    <button onClick={() => handleViewCurl('TrustHub UAT — cURL', api.trusthubUat!)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">View cURL</button>
+                  ) : <span>—</span>}
+                </td>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
+                  {api.trusthubProd ? (
+                    <button onClick={() => handleViewCurl('TrustHub Prod — cURL', api.trusthubProd!)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">View cURL</button>
+                  ) : <span>—</span>}
+                </td>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
+                  {api.documentLink ? (
+                    <a
+                      href={api.documentLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    >
+                      View Document
+                    </a>
+                  ) : '-'}
+                </td>
+                <td className="px-4 py-2.5 text-sm text-slate-700 border-b border-slate-200">
+                  <div className="max-w-[200px] whitespace-normal break-words">{api.remarks || '-'}</div>
+                </td>
+                <td className="px-4 py-2.5 text-sm border-b border-slate-200">
+                  <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${api.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}>
+                    {api.status.charAt(0).toUpperCase() + api.status.slice(1)}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-sm border-b border-slate-200">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => handleEdit(api)} className="p-1.5 hover:bg-slate-200 rounded transition-colors" title="Edit">
+                      <Pencil size={16} className="text-blue-600" />
+                    </button>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={api.status === 'active'}
+                        onChange={() => handleToggleStatus(api)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {filteredApis.length === 0 && (
               <tr>
-                <td colSpan={15} className="px-4 py-12 text-center text-slate-500">No APIs found</td>
+                <td colSpan={13} className="px-4 py-12 text-center text-slate-500">No APIs found</td>
               </tr>
             )}
           </tbody>
@@ -493,6 +386,7 @@ export default function ViewPage() {
       {showEditModal && editingApi && (
         <ApiModal mode="edit" apiData={editingApi} onClose={() => { setShowEditModal(false); setEditingApi(null); }} />
       )}
+
       {showConfirmDialog && confirmAction && (
         <ConfirmDialog
           title="Confirm Status Change"
@@ -501,9 +395,11 @@ export default function ViewPage() {
           onCancel={() => { setShowConfirmDialog(false); setConfirmAction(null); }}
         />
       )}
+
       {showCurlModal && curlModalData && (
         <CurlModal title={curlModalData.title} curlCommand={curlModalData.command} onClose={() => { setShowCurlModal(false); setCurlModalData(null); }} />
       )}
+
       {showAddModal && (
         <ApiModal mode="add" onClose={() => setShowAddModal(false)} />
       )}
