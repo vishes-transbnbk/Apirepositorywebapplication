@@ -353,7 +353,7 @@ export default function ViewPage() {
                     </td>
 
                     <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
-                      <div className="max-w-[200px] truncate">{group.description || '—'}</div>
+                      <div className="max-w-[200px] whitespace-normal break-words">{group.description || '—'}</div>
                     </td>
 
                     {/* Endpoint count */}
@@ -408,7 +408,7 @@ export default function ViewPage() {
 </td>
 
                     <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
-                      <div className="max-w-[160px] truncate">{group.remarks || '—'}</div>
+                      <div className="max-w-[160px] whitespace-normal break-words">{group.remarks || '—'}</div>
                     </td>
 
                     <td className="px-4 py-2.5 border-b border-slate-200">
