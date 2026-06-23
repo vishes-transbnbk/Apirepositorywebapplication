@@ -100,6 +100,26 @@ function CurlCell({ label, value, onView }: { label: string; value?: string; onV
   );
 }
 
+function ExpandableDescription({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const LIMIT = 80;
+  if (!text) return <span className="text-slate-400">—</span>;
+  if (text.length <= LIMIT) return <span className="text-slate-700 text-sm">{text}</span>;
+  return (
+    <div className="max-w-[200px]">
+      <span className="text-slate-700 text-sm">
+        {expanded ? text : `${text.slice(0, LIMIT)}...`}
+      </span>
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="block text-xs text-blue-500 hover:text-blue-700 mt-0.5 font-medium"
+      >
+        {expanded ? 'less' : 'more'}
+      </button>
+    </div>
+  );
+}
+
 export default function ViewPage() {
   const { apiGroups, toggleStatus } = useApi();
   const [searchQuery, setSearchQuery] = useState('');
@@ -352,8 +372,8 @@ export default function ViewPage() {
                       </span>
                     </td>
 
-                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
-                      <div className="max-w-[200px] whitespace-normal break-words">{group.description || '—'}</div>
+                    <td className="px-4 py-2.5 border-b border-slate-200">
+                      <ExpandableDescription text={group.description || ''} />
                     </td>
 
                     {/* Endpoint count */}
