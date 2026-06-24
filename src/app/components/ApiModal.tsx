@@ -19,7 +19,7 @@ const EMPTY_ENDPOINT: NewEndpoint = {
 };
 
 export default function ApiModal({ mode, apiData, onClose }: ApiModalProps) {
-  const { addApiGroup, updateApiGroup, checkDuplicate } = useApi();
+  const { addApiGroup, updateApiGroup, checkDuplicate, checkDbNameDuplicate, checkPrimaryDuplicate } = useApi();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -30,6 +30,8 @@ export default function ApiModal({ mode, apiData, onClose }: ApiModalProps) {
     description: '',
     documentLink: '',
     remarks: '',
+    dbName: '',
+    rank: '' as 'Primary' | 'Secondary' | '',
     status: 'active' as 'active' | 'inactive',
   });
 
@@ -47,6 +49,8 @@ export default function ApiModal({ mode, apiData, onClose }: ApiModalProps) {
         description: apiData.description || '',
         documentLink: apiData.documentLink || '',
         remarks: apiData.remarks || '',
+        dbName: apiData.dbName || '',
+        rank: apiData.rank || '',
         status: apiData.status,
       });
       setEndpoints(
@@ -87,6 +91,7 @@ export default function ApiModal({ mode, apiData, onClose }: ApiModalProps) {
     if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.vendor.trim()) newErrors.vendor = 'Vendor is required';
     if (!formData.type.trim()) newErrors.type = 'Type is required';
+    if (!formData.rank) newErrors.rank = 'Rank is required';
 
     // Validate endpoint names if more than one endpoint (name is optional for single)
     if (endpoints.length > 1) {
@@ -117,12 +122,36 @@ export default function ApiModal({ mode, apiData, onClose }: ApiModalProps) {
       return;
     }
 
+    // DB Name uniqueness check (case-insensitive, skip if empty)
+    if (formData.dbName.trim()) {
+      const isDbNameDuplicate = checkDbNameDuplicate(
+        formData.dbName,
+        mode === 'edit' ? apiData?.id : undefined
+      );
+      if (isDbNameDuplicate) {
+        setErrors((prev) => ({ ...prev, dbName: 'This DB Name is already used by another API.' }));
+        return;
+      }
+    }
+
+    // Primary rank uniqueness check per API name
+    if (formData.rank === 'Primary') {
+      const isPrimaryDuplicate = checkPrimaryDuplicate(
+        formData.name,
+        mode === 'edit' ? apiData?.id : undefined
+      );
+      if (isPrimaryDuplicate) {
+        setErrors((prev) => ({ ...prev, rank: 'Another API with the same name is already tagged as Primary, please check.' }));
+        return;
+      }
+    }
+
     // Filter out completely empty endpoints
     const validEndpoints = endpoints.filter(
       (ep) => ep.name.trim() || ep.vendorUat || ep.vendorProd || ep.trusthubUat || ep.trusthubProd
     );
 
-    const payload = { ...formData, endpoints: validEndpoints };
+    const payload = { ...formData, rank: formData.rank as 'Primary' | 'Secondary', endpoints: validEndpoints };
 
     if (mode === 'add') {
       addApiGroup(payload);
@@ -203,6 +232,24 @@ export default function ApiModal({ mode, apiData, onClose }: ApiModalProps) {
                 placeholder="e.g., REST, SOAP, GraphQL"
               />
               {errors.type && <p className="text-red-500 text-xs mt-1">{errors.type}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Rank <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.rank}
+                onChange={(e) => handleChange('rank', e.target.value)}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${errors.rank ? 'border-red-500' : 'border-slate-300'}`}
+              >
+                <option value="">Select Rank</option>
+                <option value="Primary">Primary</option>
+                <option value="Secondary">Secondary</option>
+              </select>
+              {errors.rank && <p className="text-red-500 text-xs mt-1">{errors.rank}</p>}
             </div>
           </div>
 
@@ -306,6 +353,17 @@ export default function ApiModal({ mode, apiData, onClose }: ApiModalProps) {
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="https://docs.example.com/api"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">DB Name</label>
+              <input
+                type="text"
+                value={formData.dbName}
+                onChange={(e) => handleChange('dbName', e.target.value)}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.dbName ? 'border-red-500' : 'border-slate-300'}`}
+                placeholder="e.g., kyc_validation_db"
+              />
+              {errors.dbName && <p className="text-red-500 text-xs mt-1">{errors.dbName}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Remarks</label>

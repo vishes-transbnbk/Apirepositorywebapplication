@@ -21,6 +21,8 @@ export interface ApiGroup {
   description?: string;
   documentLink?: string;
   remarks?: string;
+  dbName?: string;
+  rank: 'Primary' | 'Secondary';
   status: 'active' | 'inactive';
   createdAt: string;
   endpoints: ApiEndpoint[];
@@ -38,6 +40,8 @@ interface ApiContextType {
   deleteApiGroup: (id: string) => Promise<void>;
   toggleStatus: (id: string) => Promise<void>;
   checkDuplicate: (name: string, vendor: string, excludeId?: string) => boolean;
+  checkDbNameDuplicate: (dbName: string, excludeId?: string) => boolean;
+  checkPrimaryDuplicate: (name: string, excludeId?: string) => boolean;
 }
 
 const ApiContext = createContext<ApiContextType | undefined>(undefined);
@@ -77,6 +81,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       description: g.description,
       documentLink: g.document_link,
       remarks: g.remarks,
+      dbName: g.db_name,
+      rank: g.rank,
       status: g.status,
       createdAt: g.created_at,
       endpoints: (endpoints ?? [])
@@ -140,6 +146,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       description: group.description,
       document_link: group.documentLink,
       remarks: group.remarks,
+      db_name: group.dbName || null,
+      rank: group.rank,
       status: group.status,
     });
 
@@ -172,6 +180,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       description: group.description,
       document_link: group.documentLink,
       remarks: group.remarks,
+      db_name: group.dbName || null,
+      rank: group.rank,
       status: group.status,
     }).eq('id', id);
 
@@ -234,8 +244,26 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const checkDbNameDuplicate = (dbName: string, excludeId?: string): boolean => {
+    if (!dbName.trim()) return false;
+    return apiGroups.some(
+      (g) =>
+        g.id !== excludeId &&
+        g.dbName?.trim().toLowerCase() === dbName.trim().toLowerCase()
+    );
+  };
+
+  const checkPrimaryDuplicate = (name: string, excludeId?: string): boolean => {
+    return apiGroups.some(
+      (g) =>
+        g.id !== excludeId &&
+        g.name.trim().toLowerCase() === name.trim().toLowerCase() &&
+        g.rank === 'Primary'
+    );
+  };
+
   return (
-    <ApiContext.Provider value={{ apiGroups, addApiGroup, updateApiGroup, deleteApiGroup, toggleStatus, checkDuplicate }}>
+    <ApiContext.Provider value={{ apiGroups, addApiGroup, updateApiGroup, deleteApiGroup, toggleStatus, checkDuplicate, checkDbNameDuplicate, checkPrimaryDuplicate }}>
       {children}
     </ApiContext.Provider>
   );

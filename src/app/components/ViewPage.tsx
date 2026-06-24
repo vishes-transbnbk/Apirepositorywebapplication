@@ -202,7 +202,9 @@ export default function ViewPage() {
           'TrustHub UAT': '',
           'TrustHub Prod': '',
           'Document Link': g.documentLink || '',
+          'DB Name': g.dbName || '',
           'Remarks': g.remarks || '',
+          'Rank': g.rank || '',
           'Status': g.status.charAt(0).toUpperCase() + g.status.slice(1),
         });
       } else {
@@ -219,7 +221,9 @@ export default function ViewPage() {
             'TrustHub UAT': ep.trusthubUat || '',
             'TrustHub Prod': ep.trusthubProd || '',
             'Document Link': g.documentLink || '',
+            'DB Name': g.dbName || '',
             'Remarks': g.remarks || '',
+            'Rank': g.rank || '',
             'Status': g.status.charAt(0).toUpperCase() + g.status.slice(1),
           });
         });
@@ -255,11 +259,12 @@ export default function ViewPage() {
   };
 
   const filterableCols = [
-    { key: 'jiraId',  label: 'JIRA ID'     },
-    { key: 'name',    label: 'Name'         },
-    { key: 'vendor',  label: 'Vendor'       },
-    { key: 'type',    label: 'Type'         },
-    { key: 'status',  label: 'Status'       },
+    { key: 'jiraId',  label: 'JIRA ID'   },
+    { key: 'name',    label: 'Name'       },
+    { key: 'vendor',  label: 'Vendor'     },
+    { key: 'type',    label: 'Type'       },
+    { key: 'status',  label: 'Status'     },
+    { key: 'rank',    label: 'Rank'       },
   ];
 
   return (
@@ -327,6 +332,7 @@ export default function ViewPage() {
               <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">TrustHub UAT</th>
               <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">TrustHub Prod</th>
               <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-24">Document</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 min-w-[140px]">DB Name</th>
               <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 min-w-[160px]">Remarks</th>
               <th className="px-4 py-3 text-left font-semibold text-slate-700 border-b border-slate-200 w-28">Actions</th>
             </tr>
@@ -428,6 +434,10 @@ export default function ViewPage() {
 </td>
 
                     <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
+                      <div className="max-w-[140px] truncate">{group.dbName || '—'}</div>
+                    </td>
+
+                    <td className="px-4 py-2.5 border-b border-slate-200 text-slate-700">
                       <div className="max-w-[160px] whitespace-normal break-words">{group.remarks || '—'}</div>
                     </td>
 
@@ -495,6 +505,7 @@ export default function ViewPage() {
                       <td className="border-b border-indigo-100" />
                       <td className="border-b border-indigo-100" />
                       <td className="border-b border-indigo-100" />
+                      <td className="border-b border-indigo-100" />
                     </tr>
                   ))}
                 </>
@@ -503,7 +514,7 @@ export default function ViewPage() {
 
             {filteredGroups.length === 0 && (
               <tr>
-                <td colSpan={15} className="px-4 py-12 text-center text-slate-500">No APIs found</td>
+                <td colSpan={17} className="px-4 py-12 text-center text-slate-500">No APIs found</td>
               </tr>
             )}
           </tbody>
