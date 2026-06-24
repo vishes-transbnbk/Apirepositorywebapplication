@@ -378,6 +378,15 @@ export default function ViewPage() {
                       </span>
                     </td>
 
+                    {/* Rank badge */}
+                    <td className="px-4 py-2.5 border-b border-slate-200">
+                      {group.rank ? (
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${group.rank === 'Primary' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'}`}>
+                          {group.rank}
+                        </span>
+                      ) : '—'}
+                    </td>
+
                     <td className="px-4 py-2.5 border-b border-slate-200">
                       <ExpandableDescription text={group.description || ''} />
                     </td>
@@ -478,7 +487,8 @@ export default function ViewPage() {
                         </div>
                       </td>
 
-                      {/* Vendor, Type, Status, Description — blank on child rows */}
+                      {/* Vendor, Type, Status, Rank, Description — blank on child rows */}
+                      <td className="border-b border-indigo-100" />
                       <td className="border-b border-indigo-100" />
                       <td className="border-b border-indigo-100" />
                       <td className="border-b border-indigo-100" />
