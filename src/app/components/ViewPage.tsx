@@ -299,7 +299,8 @@ export default function ViewPage() {
         />
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
+      <div className="bg-white rounded-lg shadow">
+        <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead className="bg-slate-100 sticky top-0 z-10">
             <tr>
@@ -529,6 +530,7 @@ export default function ViewPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showEditModal && editingApi && (
